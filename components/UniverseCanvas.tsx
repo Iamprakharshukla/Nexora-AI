@@ -29,7 +29,8 @@ export default function UniverseCanvas() {
 
     // Colors: cyan, pink, neon blue, white glow
     const colors = ['#00ffcc', '#cc00ff', '#0077ff', '#ffffff'];
-    const particleCount = 200;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const particleCount = isMobile ? 35 : 180;
 
     for (let i = 0; i < particleCount; i++) {
       particles.push({
@@ -124,27 +125,29 @@ export default function UniverseCanvas() {
         ctx.fill();
         ctx.shadowBlur = 0; // reset
 
-        // Render proximity connection strings
-        particles.forEach((other) => {
-          if (p === other) return;
-          const otherRotX = Math.cos(other.angle) * other.distance;
-          const otherRotY = Math.sin(other.angle) * other.distance * 0.42;
-          const otherX = width / 2 + otherRotX + mouseX;
-          const otherY = height / 2 + otherRotY + mouseY + other.z * 0.08;
+        // Render proximity connection strings (Desktop only for performance optimization)
+        if (!isMobile) {
+          particles.forEach((other) => {
+            if (p === other) return;
+            const otherRotX = Math.cos(other.angle) * other.distance;
+            const otherRotY = Math.sin(other.angle) * other.distance * 0.42;
+            const otherX = width / 2 + otherRotX + mouseX;
+            const otherY = height / 2 + otherRotY + mouseY + other.z * 0.08;
 
-          const dx = posX - otherX;
-          const dy = posY - otherY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+            const dx = posX - otherX;
+            const dy = posY - otherY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < 55) {
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.07 * (1 - dist / 55)})`;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(posX, posY);
-            ctx.lineTo(otherX, otherY);
-            ctx.stroke();
-          }
-        });
+            if (dist < 55) {
+              ctx.strokeStyle = `rgba(255, 255, 255, ${0.07 * (1 - dist / 55)})`;
+              ctx.lineWidth = 0.5;
+              ctx.beginPath();
+              ctx.moveTo(posX, posY);
+              ctx.lineTo(otherX, otherY);
+              ctx.stroke();
+            }
+          });
+        }
       });
 
       // Render Floating Core text overlays

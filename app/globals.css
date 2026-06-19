@@ -12,7 +12,12 @@ body {
   color: var(--foreground);
   overflow-x: hidden;
   font-family: 'Outfit', 'Inter', sans-serif;
-  cursor: none; /* Hide default browser cursor for custom premium interactive cursor */
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body {
+    cursor: none; /* Hide default browser cursor for custom premium interactive cursor */
+  }
 }
 
 /* Custom Scrollbar - Linear style */

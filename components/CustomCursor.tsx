@@ -9,6 +9,9 @@ export default function CustomCursor() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    const isMobile = window.matchMedia('(max-width: 767px)').matches || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (isMobile) return;
+
     const dot = dotRef.current;
     const ring = ringRef.current;
     if (!dot || !ring) return;
