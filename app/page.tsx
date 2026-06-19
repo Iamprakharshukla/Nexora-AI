@@ -34,7 +34,6 @@ export default function Home() {
   // Hero search state
   const [heroSearch, setHeroSearch] = useState({ city: '', bhk: '', type: 'BUY' as 'BUY' | 'RENT' });
   const [heroSearchTriggered, setHeroSearchTriggered] = useState(false);
-  const [activeMobileTab, setActiveMobileTab] = useState<'ESTATES' | 'LOCALITIES' | 'EMI' | 'ABOUT' | 'ANALYTICS' | 'REVIEWS'>('ESTATES');
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,52 +309,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Mobile Tab Selector - Only visible on Mobile */}
-      <div className="block md:hidden sticky top-16 z-30 bg-[#030303]/90 backdrop-blur-md border-b border-white/5 py-3 overflow-x-auto whitespace-nowrap px-4 scroll-mt-16 scrollbar-none">
-        <div className="flex gap-2 min-w-max">
-          {[
-            { id: 'ESTATES', label: '🏠 Estates' },
-            { id: 'LOCALITIES', label: '📍 Localities' },
-            { id: 'EMI', label: '🧮 EMI Calc' },
-            { id: 'ABOUT', label: '✨ About Us' },
-            { id: 'ANALYTICS', label: '📊 Yields' },
-            { id: 'REVIEWS', label: '★ Reviews' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveMobileTab(tab.id as any);
-                const target = document.getElementById('mobile-anchor');
-                if (target) {
-                  target.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className={`px-4 py-2 rounded-xl text-[9px] font-bold font-mono tracking-wider transition-all border ${
-                activeMobileTab === tab.id
-                  ? 'bg-[#00ffcc] text-black border-[#00ffcc] font-black shadow-glow-cyan'
-                  : 'bg-white/3 border-white/5 text-gray-400 hover:text-white'
-              }`}
-            >
-              {tab.label.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      {/* Mobile scroll target */}
-      <div id="mobile-anchor" className="scroll-mt-28" />
-
       {/* Product list */}
-      <div className={`md:block ${activeMobileTab === 'ESTATES' ? 'block' : 'hidden'}`}>
-        <div id="properties" className="scroll-mt-20">
-          <ProductGrid products={propertiesList} onAddToCart={handleAddToCart} />
-        </div>
+      <div id="properties" className="scroll-mt-20">
+        <ProductGrid products={propertiesList} onAddToCart={handleAddToCart} />
       </div>
 
-      {/* About Us & History Section Wrapper */}
-      <div className={`md:block ${activeMobileTab === 'ABOUT' ? 'block' : 'hidden'}`}>
-        {/* 1. About Us Section */}
-        <section id="about" className="relative z-10 py-24 max-w-7xl mx-auto px-6 border-t border-white/5 scroll-mt-20">
+      {/* 1. About Us Section */}
+      <section id="about" className="relative z-10 py-24 max-w-7xl mx-auto px-6 border-t border-white/5 scroll-mt-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <span className="px-3.5 py-1.5 rounded-full bg-white/3 border border-white/5 text-[9px] font-bold font-mono tracking-widest text-[#00ffcc] uppercase inline-flex items-center gap-2">
@@ -493,12 +453,9 @@ export default function Home() {
           </div>
         </div>
       </section>
-      </div>
 
-      {/* Sales & Analytics Section Wrapper */}
-      <div className={`md:block ${activeMobileTab === 'ANALYTICS' ? 'block' : 'hidden'}`}>
-        {/* 3. Sales & Analytics Section */}
-        <section id="sales" className="relative z-10 py-24 max-w-7xl mx-auto px-6 border-t border-white/5 scroll-mt-20">
+      {/* 3. Sales & Analytics Section */}
+      <section id="sales" className="relative z-10 py-24 max-w-7xl mx-auto px-6 border-t border-white/5 scroll-mt-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-5 space-y-6">
             <span className="px-3.5 py-1.5 rounded-full bg-white/3 border border-white/5 text-[9px] font-bold font-mono tracking-widest text-[#00ffcc] uppercase inline-flex items-center gap-2">
@@ -637,12 +594,9 @@ export default function Home() {
           </div>
         </div>
       </section>
-      </div>
 
-      {/* Testimonials Section Wrapper */}
-      <div className={`md:block ${activeMobileTab === 'REVIEWS' ? 'block' : 'hidden'}`}>
-        {/* 4. Testimonials Section */}
-        <section id="testimonials" className="relative z-10 py-24 max-w-7xl mx-auto px-6 border-t border-white/5 scroll-mt-20">
+      {/* 4. Testimonials Section */}
+      <section id="testimonials" className="relative z-10 py-24 max-w-7xl mx-auto px-6 border-t border-white/5 scroll-mt-20">
         <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
           <span className="px-3.5 py-1.5 rounded-full bg-white/3 border border-white/5 text-[9px] font-bold font-mono tracking-widest text-[#00ffcc] uppercase inline-flex items-center gap-2">
             <Users className="w-3.5 h-3.5 text-[#00ffcc]" /> Client Testimonials
@@ -723,20 +677,15 @@ export default function Home() {
           </div>
         </div>
       </section>
-      </div>
 
       {/* Locality Insights */}
-      <div className={`md:block ${activeMobileTab === 'LOCALITIES' ? 'block' : 'hidden'}`}>
-        <div className="border-t border-white/5">
-          <LocalityInsights />
-        </div>
+      <div className="border-t border-white/5">
+        <LocalityInsights />
       </div>
 
       {/* EMI Calculator */}
-      <div className={`md:block ${activeMobileTab === 'EMI' ? 'block' : 'hidden'}`}>
-        <div className="border-t border-white/5 bg-black/20">
-          <EMICalculator />
-        </div>
+      <div className="border-t border-white/5 bg-black/20">
+        <EMICalculator />
       </div>
 
       {/* Jarvis chatbot assistant */}
