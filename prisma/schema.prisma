@@ -1,0 +1,142 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum Purpose {
+  BUY
+  RENT
+  SELL
+}
+
+enum Furnishing {
+  FURNISHED
+  SEMI_FURNISHED
+  UNFURNISHED
+}
+
+enum InquiryType {
+  SITE_VISIT
+  CALL_BACK
+  GENERAL
+}
+
+enum InquiryStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id         String      @id @default(cuid())
+  name       String
+  email      String      @unique
+  phone      String?
+  password   String
+  role       Role        @default(USER)
+  city       String?
+  budget     String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  shortlists Shortlist[]
+  inquiries  Inquiry[]
+  properties Property[]
+}
+
+model Property {
+  id               String      @id @default(cuid())
+  name             String
+  price            Float
+  brand            String
+  description      String
+  category         String
+  rating           Float       @default(4.5)
+  reviewsCount     Int         @default(0)
+  carpetArea       String?
+  carpetAreaSqFt   Float?
+  facing           String?
+  completionStatus String?
+  reraId           String?
+  purpose          Purpose     @default(BUY)
+  bhk              Int?
+  locality         String?
+  city             String?
+  furnishing       Furnishing?
+  floor            Int?
+  totalFloors      Int?
+  parking          Int?
+  amenities        String      @default("[]") // JSON string
+  pricePerSqFt     Float?
+  possessionDate   String?
+  constructionAge  String?
+  images           String      @default("[]") // JSON string
+  isApproved       Boolean     @default(false)
+  isFeatured       Boolean     @default(false)
+  postedById       String?
+  postedBy         User?       @relation(fields: [postedById], references: [id])
+  shortlists       Shortlist[]
+  inquiries        Inquiry[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Shortlist {
+  id         String   @id @default(cuid())
+  userId     String
+  propertyId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, propertyId])
+}
+
+model Inquiry {
+  id         String        @id @default(cuid())
+  name       String
+  phone      String
+  email      String?
+  message    String?
+  type       InquiryType   @default(SITE_VISIT)
+  status     InquiryStatus @default(PENDING)
+  propertyId String
+  userId     String?
+  property   Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user       User?         @relation(fields: [userId], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model Locality {
+  id                String @id @default(cuid())
+  name              String
+  city              String
+  avgPricePerSqFt   Float
+  yoyGrowth         Float
+  lifestyleScore    Float
+  connectivityScore Float
+  totalListings     Int    @default(0)
+  trend             String @default("STABLE") // RISING | STABLE | COOLING
+
+  @@unique([name, city])
+}
+
+model Newsletter {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}

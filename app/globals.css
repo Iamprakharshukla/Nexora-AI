@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #030303;
+  --foreground: #ffffff;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  overflow-x: hidden;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  cursor: none; /* Hide default browser cursor for custom premium interactive cursor */
+}
+
+/* Custom Scrollbar - Linear style */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #010101;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a1a1a;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a2a2a;
+}
+
+/* Glassmorphism Panels */
+.glassmorphism {
+  background: rgba(5, 5, 5, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glassmorphism-light {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Glowing text effects */
+.text-glow-cyan {
+  text-shadow: 0 0 15px rgba(0, 255, 204, 0.5), 0 0 30px rgba(0, 255, 204, 0.2);
+}
+
+.text-glow-pink {
+  text-shadow: 0 0 15px rgba(204, 0, 255, 0.5), 0 0 30px rgba(204, 0, 255, 0.2);
+}
+
+.border-glow:hover {
+  border-color: rgba(0, 255, 204, 0.4) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+}
+
+/* Floating custom cursor styling */
+.cursor-dot {
+  width: 6px;
+  height: 6px;
+  background: #00ffcc;
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  transition: width 0.2s, height 0.2s, background-color 0.2s;
+}
+
+.cursor-ring {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid rgba(0, 255, 204, 0.3);
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9998;
+  transform: translate(-50%, -50%);
+  transition: transform 0.08s ease-out, border-color 0.2s, width 0.2s, height 0.2s;
+}
+
+/* Hover scales for custom cursor */
+.cursor-hover .cursor-dot {
+  width: 10px;
+  height: 10px;
+  background: #cc00ff;
+}
+
+.cursor-hover .cursor-ring {
+  width: 48px;
+  height: 48px;
+  border-color: rgba(204, 0, 255, 0.4);
+}
+
+/* Grid lines overlay for deep-space texture */
+.grid-lines {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+}
+
+/* ── Global dark select override ─────────────────────────────────────────── */
+/* Forces every native <select> dropdown to use the dark theme.               */
+/* Works on Chrome, Edge, and Firefox on Windows.                             */
+select {
+  background-color: #0d0d0d !important;
+  color: #d1d5db !important;
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #0d0d0d !important;
+  color: #d1d5db !important;
+}
+
+select:focus {
+  outline: none;
+  border-color: rgba(0, 255, 204, 0.35) !important;
+}
+
+/* ── Global input text visibility fix ────────────────────────────────────── */
+/* Ensures typed text is always visible across all input fields site-wide.    */
+input,
+textarea {
+  background-color: #0d0d0d !important;
+  color: #e5e7eb !important;
+  caret-color: #00ffcc;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #4b5563 !important;
+  opacity: 1;
+}
+
+input:focus,
+textarea:focus {
+  outline: none !important;
+  color: #ffffff !important;
+}
+
+/* Inputs — dark background globally so no white flash on autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #0d0d0d inset !important;
+  -webkit-text-fill-color: #e5e7eb !important;
+  caret-color: #00ffcc;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}

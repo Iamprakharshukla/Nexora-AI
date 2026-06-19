@@ -1,0 +1,98 @@
+name: Titan Commerce CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Stage 1: Validation and workspace code check
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository codebase
+        uses: actions/checkout@v3
+
+      - name: Setup Node environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24.x
+          cache: 'npm'
+
+      - name: Install Monorepo Workspaces dependencies
+        run: npm ci
+
+      - name: Lint codebase elements
+        run: npm run lint
+
+      - name: Run Jest Unit and integration tests
+        run: npm run test
+
+      - name: Verify Types compilation
+        run: npx tsc --noEmit
+
+  # Stage 2: Compile Docker images and push to secure AWS ECR
+  build-and-push:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Tag Backend Docker Node
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/titan-api:${{ github.sha }} -t $ECR_REGISTRY/titan-api:latest -f docker/Dockerfile.backend .
+          docker push $ECR_REGISTRY/titan-api:${{ github.sha }}
+          docker push $ECR_REGISTRY/titan-api:latest
+
+      - name: Build and Tag Frontend Docker Web
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -t $ECR_REGISTRY/titan-app:${{ github.sha }} -t $ECR_REGISTRY/titan-app:latest -f docker/Dockerfile.frontend .
+          docker push $ECR_REGISTRY/titan-app:${{ github.sha }}
+          docker push $ECR_REGISTRY/titan-app:latest
+
+  # Stage 3: Rollout deployment to AWS EKS cluster
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup kubectl CLI tool
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure AWS Kubeconfig credentials
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name titan-kubernetes-cluster
+
+      - name: Inject image build tags in manifests
+        run: |
+          sed -i "s|titan-registry.ai/titan/api:latest|${{ secrets.AWS_ECR_REGISTRY }}/titan-api:${{ github.sha }}|g" k8s/k8s-manifests.yaml
+          sed -i "s|titan-registry.ai/titan/app:latest|${{ secrets.AWS_ECR_REGISTRY }}/titan-app:${{ github.sha }}|g" k8s/k8s-manifests.yaml
+
+      - name: Apply Kubernetes deployment sets
+        run: |
+          kubectl apply -f k8s/k8s-manifests.yaml
+          kubectl rollout status deployment/titan-backend-api -n titan-commerce
+          kubectl rollout status deployment/titan-frontend-app -n titan-commerce
