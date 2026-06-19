@@ -1,77 +1,102 @@
-# 🚀 Project Titan Commerce AI
-## The AI-Native Next-Generation E-Commerce Ecosystem
+# 🌌 Nexora AI — Immersive Luxury Real Estate Platform
 
-Project Titan is a world-class, enterprise-grade, high-fidelity e-commerce ecosystem designed to showcase Apple-like WebGL components, Tesla-like scroll interactions, Stripe-like payment checkouts, and OpenAI-style AI Copilot assistants.
-
----
-
-## 🌟 Key Architecture & Features
-
-### 🌌 Immersive 3D Space & Luxury UI
-- **Procedural Orbits Canvas**: A responsive, 120 FPS WebGL-inspired canvas rendering product nodes orbiting a central quantum core.
-- **Micro-Animations**: Glassmorphism controls and cursor coordinate tracking elements built using modern CSS, hover states, and smooth layouts.
-
-### 🧠 AI Shopping Copilot
-- **Voice Commerce**: Built-in speech recognition (STT) and voice speech synthesizer (TTS) logic.
-- **Conversational Recommendations**: Dynamic product suggestion cards generated directly within the chat stream.
-
-### 🔍 Semantic NLP Search
-- **Embedding Space Vector Projection**: Interactive 2D projection mapping that visualizes semantic distances between query keywords and products.
-- **Simulated Visual Search**: Fast image upload mapping feature maps via ViT/CLIP.
-
-### 📊 Admin Super Panel & Analytics
-- **Live Sockets**: Dynamic tick streams showcasing user traffic, payment alerts, and fraud logs.
-- **Admin AI Insights**: Natural Language prompts parsed into SQL insights and charts forecasts.
+Nexora AI is an ultra-premium, high-fidelity real estate ecosystem. It blends modern **glassmorphic dark-theme aesthetics** with **AI-native capability** (interactive conversational assistant, automated pricing valuation, intelligent search console) and is backed by a **Prisma + SQLite Next.js API backend**.
 
 ---
 
-## 🛠️ Stack & Technology
+## 🌟 Core Features & Modules
 
-- **Frontend Workspace**: Next.js 15+ App Router, React 19, Tailwind CSS, Lucide icons.
-- **Backend Workspace**: NestJS monolithic core, Socket.io gateway, Swagger APIs.
-- **Databases**: PostgreSQL (Prisma), MongoDB (Mongoose), Redis caches, Qdrant vector DB.
-- **Infrastructure**: Docker Compose configurations, Kubernetes manifests, CI/CD actions.
+### 1. 🏠 Luxury Estates Catalog
+- **Interactive Search Console**: Highly refined tabs for **Buy** and **Rent** with dropdowns for City, BHK configuration, and property types.
+- **Comparison Engine**: Select up to 3 properties to compare carpet area, pricing, facing, possession date, RERA IDs, and custom premium amenities.
+- **Live Price Ticker**: Simulates live luxury real estate index shifts with rising/stable indicator animations.
+
+### 2. 🧠 AI Jarvis Orb & Command Palette
+- **Conversational Real Estate Assistant**: Real-time text-to-property match engine. Suggests luxury estates dynamically based on custom user prompts (e.g. *"Show me villas in Bangalore under 10 Crore"*).
+- **Interactive Visualizer**: Dynamic visual orb pulsing animations.
+
+### 3. 📝 AI-Powered Property Listing Wizard
+- **Owner & Dealer Flow**: 4-step wizard to configure properties, furnish status, facing direction, carpet area, and pricing.
+- **AI-Powered Description Generation**: Enhances owner listings on-the-fly and automatically projects optimal square footage valuations based on pre-seeded city datasets.
+
+### 4. 🧮 Interactive EMI Matrix Calculator
+- **Dynamic Valuation**: Real-time principal vs. interest breakdown.
+- **Dual Sliders**: Adjust loan amount, tenure, and interest rates with immediate visual graphs representing interest components.
+
+### 5. 📊 Locality Insights & Market Matrix
+- **Market Trends**: Details YoY property appreciation growth, connectivity scores, lifestyle scores, and listings trends across Worli, Whitefield, DLF Phase 5, and more.
+- **Appreciation Forecasts**: Clean SVG charts tracking real estate yields up to the year 2030.
 
 ---
 
-## 🚀 Getting Started (Quick Run)
+## 🛠️ Technology Stack
 
-Follow these commands to launch the workspace locally:
+| Layer | Technologies | Description |
+|---|---|---|
+| **Frontend** | React 19, Next.js 15 App Router, Tailwind CSS, Framer Motion | High-performance user interface with smooth animations and interactive 3D WebGL space canvases. |
+| **Database** | SQLite, Prisma ORM | File-based database configuration requiring zero external setup. |
+| **Authentication** | JWT (`jose`), `bcryptjs` | State-of-the-art token security and hashed credential verification. |
+| **Styling** | Custom HSL CSS, CSS Glassmorphism | Custom variables to force consistent dark modes, autofill fixes, and select element dropdown coloring. |
 
-### 1. Install Workspace Dependencies
-Run this command at the root workspace directory to install all monorepo packages (shared, frontend, backend):
+---
+
+## ⚡ API Endpoint Reference
+
+### 🔐 Auth Router
+- `POST /api/auth/register` — Standard registration. Generates JWT.
+- `POST /api/auth/login` — Verifies bcrypt hash. Returns JWT.
+- `GET /api/auth/me` — Fetches current user session profile.
+
+### 🏢 Properties Router
+- `GET /api/properties` — Lists approved properties with filter parameters (city, BHK, category, price bounds).
+- `POST /api/properties` — Creates property listing pending verification.
+- `GET /api/properties/[id]` — Fetches comprehensive details for a specific listing.
+
+### ❤️ Shortlists Router (JWT Required)
+- `GET /api/shortlist` — Lists user-shortlisted estates.
+- `POST /api/shortlist` — Adds a property to the user's shortlist database.
+- `DELETE /api/shortlist/[id]` — Removes property from shortlist.
+
+### 📩 Inquiries & Subscriptions
+- `POST /api/inquiries` — Submits a callback or site visit booking request.
+- `POST /api/newsletter` — Registers email for off-market estate alerts.
+
+---
+
+## 🚀 Running Locally
+
+Follow these quick commands to spin up the codebase on your machine:
+
+### 1. Install Dependencies
 ```bash
 npm install
 ```
 
-### 2. Startup Backend Service
-Start the NestJS Core API server on port 4000:
+### 2. Configure Database & Migrations
+Initialize the SQLite database (`prisma/dev.db`) and seed properties:
 ```bash
-npm run dev --workspace=@titan/backend
+npx prisma migrate dev --name init
+npx prisma db seed
 ```
 
-### 3. Startup Frontend Web App
-Start the Next.js development server on port 3000:
+### 3. Run Dev Server
 ```bash
-npm run dev --workspace=@titan/frontend
+npm run dev
 ```
-
-Now, navigate to:
-- **Web App**: http://localhost:3000
-- **Swagger Documentation**: http://localhost:4000/api/docs
+Open **[http://localhost:3000](http://localhost:3000)** to browse the application.
 
 ---
 
-## 🧪 Testing Configurations
+## 🔑 Pre-Seeded Accounts
 
-### Unit & Integration Tests (Jest)
-Run unit validations across the backend and shared folders:
-```bash
-npm run test --workspaces
-```
+Verify full-fledged user and admin workflows immediately using these pre-seeded accounts:
 
-### E2E Tests (Playwright)
-Run end-to-end user flow scripts:
-```bash
-npx playwright test
-```
+### 👤 Buyer / Client Account
+- **Email**: `test@nexora.ai`
+- **Password**: `user@123`
+
+### 🔑 Administrator Dashboard Account
+- **Email**: `admin@nexora.ai`
+- **Password**: `nexora@admin123`
+
+*Note: Any new credentials entered in the email password login tab will automatically register a new user in the SQLite database.*
