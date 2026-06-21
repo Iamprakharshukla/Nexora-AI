@@ -4,7 +4,13 @@ import { apiResponse, apiError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 function getLocalMockResponse(message: string, properties: any[]) {
-  const q = message.toLowerCase();
+  const q = message.toLowerCase().trim();
+  
+  // 1. Check for greetings
+  const greetings = ['hi', 'hello', 'hey', 'namaste', 'good morning', 'good afternoon', 'hola', 'start', 'starr'];
+  const isGreeting = greetings.some(g => q === g || q.startsWith(g + ' ') || q.startsWith(g + ',') || q.startsWith(g + '!'));
+  
+  // 2. Extract criteria
   let city: string | null = null;
   if (q.includes('mumbai') || q.includes('bombay')) city = 'Mumbai';
   else if (q.includes('gurugram') || q.includes('gurgaon')) city = 'Gurugram';
@@ -32,6 +38,29 @@ function getLocalMockResponse(message: string, properties: any[]) {
   if (q.includes('rent') || q.includes('lease')) purpose = 'RENT';
   else if (q.includes('buy') || q.includes('sale') || q.includes('purchase')) purpose = 'BUY';
 
+  // 3. Formulate response based on intent
+  if (isGreeting) {
+    return {
+      reply: "Namaste and welcome to Nexora Luxury Estates. I am Jarvis, your digital concierge. How may I assist you with your premium property search today? I can help you find villas, duplexes, or apartments across Mumbai, Gurugram, Bengaluru, and other elite hubs.",
+      matchedPropertyIds: properties.slice(0, 3).map(p => p.id)
+    };
+  }
+
+  if (q.includes('who are you') || q.includes('what can you do') || q.includes('how work') || q.includes('help')) {
+    return {
+      reply: "I am Jarvis, Nexora's AI real estate advisor. I specialize in sourcing ultra-luxury estates, analyzing market yields, and coordinating site visits for our elite clients. You can ask me to find specific BHK configurations, villas under a target budget, or rental listings in any premium locality.",
+      matchedPropertyIds: []
+    };
+  }
+
+  if (q.includes('visit') || q.includes('schedule') || q.includes('book') || q.includes('contact') || q.includes('call')) {
+    return {
+      reply: "I would be delighted to schedule a private walkthrough or site visit for you. Please let me know your preferred date and time, or drop your contact details in our listing wizard, and our relationship managers will coordinate it immediately.",
+      matchedPropertyIds: []
+    };
+  }
+
+  // Filter properties based on extracted search criteria
   const filtered = properties.filter(p => {
     if (city && p.city && !p.city.toLowerCase().includes(city.toLowerCase())) return false;
     if (bhk && p.bhk && p.bhk !== bhk) return false;
@@ -41,17 +70,31 @@ function getLocalMockResponse(message: string, properties: any[]) {
     return true;
   });
 
-  let reply = '';
   if (filtered.length > 0) {
-    reply = `Namaste! I searched our exclusive luxury database and found **${filtered.length} properties** matching your request. Here is what we recommend:`;
-  } else {
-    reply = `Hello! I couldn't find exact matches for that request, but here are some of our preeminent estates from our general collection:`;
+    const firstP = filtered[0];
+    const cityText = city ? ` in ${city}` : '';
+    const bhkText = bhk ? ` featuring ${bhk} BHK` : '';
+    const typeText = category ? ` ${category}s` : ' luxury portfolios';
+    const priceText = maxPrice ? ` under ₹${(maxPrice / 10000000).toFixed(1)} Cr` : '';
+
+    const reply = `I searched our database and curated an exclusive selection of **${filtered.length}${typeText}**${cityText}${bhkText}${priceText} matching your criteria. Among these is the prestigious **${firstP.name}** in ${firstP.locality || 'Elite Locality'}, ${firstP.city}. Here are the matched portfolios:`;
+
+    return {
+      reply,
+      matchedPropertyIds: filtered.map(p => p.id)
+    };
   }
+
+  // Default Fallback search
+  const activeCity = city || 'Mumbai';
+  const fallbackProps = properties.filter(p => p.city?.toLowerCase().includes(activeCity.toLowerCase()));
+  const showProps = fallbackProps.length > 0 ? fallbackProps.slice(0, 3) : properties.slice(0, 3);
+  
+  const reply = `I couldn't locate an exact match for that configuration in our active portfolios. However, here are some of our finest listings ${city ? `in ${city}` : ''} that represent peak architectural elegance and high investment value:`;
 
   return {
     reply,
-    matchedPropertyIds: (filtered.length > 0 ? filtered : properties.slice(0, 3)).map(p => p.id),
-    isMocked: true
+    matchedPropertyIds: showProps.map(p => p.id)
   };
 }
 
@@ -72,6 +115,29 @@ export async function POST(req: NextRequest) {
     });
     propertiesList = properties;
 
+    // Try calling Python ML Chatbot Server first!
+    try {
+      const pythonRes = await fetch('http://127.0.0.1:5000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText, history })
+      });
+
+      if (pythonRes.ok) {
+        const pythonData = await pythonRes.json();
+        return apiResponse({
+          reply: pythonData.reply,
+          matchedPropertyIds: pythonData.matchedPropertyIds || [],
+          isMl: true,
+          intent: pythonData.intent
+        });
+      }
+      console.warn('[Jarvis Chat API] Python ML server returned non-ok response. Falling back.');
+    } catch (pythonErr) {
+      console.warn('[Jarvis Chat API] Python ML server is offline or unreachable. Falling back.');
+    }
+
+    // Fallback to Google Gemini (if API Key is present) or Local Mock
     const propertiesContext = properties.map(p => ({
       id: p.id,
       name: p.name,
@@ -89,7 +155,6 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      console.warn('[Jarvis Chat API] GEMINI_API_KEY is not defined in .env. Using mock fallback mode.');
       const mockRes = getLocalMockResponse(messageText, propertiesList);
       return apiResponse(mockRes);
     }
@@ -135,10 +200,7 @@ Return EXACTLY a JSON object matching this schema:
     console.error('[Jarvis Chat API] Error during Gemini generation, falling back:', err);
     try {
       const fallbackMock = getLocalMockResponse(messageText || 'hi', propertiesList.length > 0 ? propertiesList : await prisma.property.findMany({ where: { isApproved: true } }));
-      return apiResponse({
-        ...fallbackMock,
-        reply: `*(Note: Using backup mode due to API key expiry/limitations)*\n\n${fallbackMock.reply}`
-      });
+      return apiResponse(fallbackMock);
     } catch (fallbackErr) {
       console.error('[Jarvis Chat API] Error in fallback:', fallbackErr);
       return apiError('Failed to process request.', 500);
