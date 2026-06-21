@@ -128,100 +128,47 @@ export default function JarvisOrb({ onAddToCart }: { onAddToCart: (p: any) => vo
     window.speechSynthesis.speak(u);
   };
 
-  const submitMessage = (queryText: string) => {
+  const submitMessage = async (queryText: string) => {
     if (!queryText.trim()) return;
 
     const userMsg: Message = { role: 'user', content: queryText };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const q = queryText.toLowerCase();
-      
-      // 1. Detect City
-      let city: string | null = null;
-      if (q.includes('mumbai') || q.includes('bombay')) city = 'Mumbai';
-      else if (q.includes('gurugram') || q.includes('gurgaon')) city = 'Gurugram';
-      else if (q.includes('bengaluru') || q.includes('bangalore')) city = 'Bengaluru';
-      else if (q.includes('delhi') || q.includes('ncr')) city = 'Delhi';
-      else if (q.includes('pune')) city = 'Pune';
-      else if (q.includes('hyderabad')) city = 'Hyderabad';
-
-      // 2. Detect BHK configuration
-      let bhk: number | null = null;
-      const bhkMatch = q.match(/(\d+)\s*bhk/);
-      if (bhkMatch) {
-        bhk = parseInt(bhkMatch[1]);
-      } else {
-        const bedroomMatch = q.match(/(\d+)\s*bedroom/);
-        if (bedroomMatch) {
-          bhk = parseInt(bedroomMatch[1]);
-        }
-      }
-
-      // 3. Detect Price boundary (e.g. under 10 Cr, below 5 Crore, under 80 Lakhs)
-      let maxPrice: number | null = null;
-      const croreMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:crore|cr)/);
-      const lakhMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lakhs|l)/);
-      if (croreMatch) {
-        maxPrice = parseFloat(croreMatch[1]) * 10000000;
-      } else if (lakhMatch) {
-        maxPrice = parseFloat(lakhMatch[1]) * 100000;
-      } else {
-        const numberMatch = q.match(/(?:under|below|less than)\s*(\d+)/);
-        if (numberMatch) {
-          const val = parseInt(numberMatch[1]);
-          if (val < 100) {
-            maxPrice = val * 10000000;
-          }
-        }
-      }
-
-      // 4. Detect Category
-      let category: string | null = null;
-      if (q.includes('villa') || q.includes('mansion') || q.includes('house')) category = 'Villa';
-      else if (q.includes('penthouse') || q.includes('duplex')) category = 'Penthouse';
-      else if (q.includes('apartment') || q.includes('flat') || q.includes('studio')) category = 'Apartment';
-      else if (q.includes('township')) category = 'Township';
-
-      // 5. Detect Purpose
-      let purpose: 'BUY' | 'RENT' | null = null;
-      if (q.includes('rent') || q.includes('lease')) purpose = 'RENT';
-      else if (q.includes('buy') || q.includes('sale') || q.includes('purchase')) purpose = 'BUY';
-
-      // Perform dynamic filtering on active database properties
-      let recommendations = activeProperties.filter(p => {
-        if (city && p.city && !p.city.toLowerCase().includes(city.toLowerCase())) return false;
-        if (bhk && p.bhk && p.bhk !== bhk) return false;
-        if (maxPrice && p.price && p.price > maxPrice) return false;
-        if (category && p.category && !p.category.toLowerCase().includes(category.toLowerCase())) return false;
-        if (purpose && p.purpose && p.purpose !== purpose) return false;
-        return true;
+    try {
+      const res = await fetch('/api/jarvis/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: queryText,
+          history: messages.map(m => ({ role: m.role, content: m.content }))
+        })
       });
 
-      let reply = '';
-      if (recommendations.length > 0) {
-        const matchingCity = city ? ` in ${city}` : '';
-        const matchingBhk = bhk ? ` featuring ${bhk} BHK` : '';
-        const matchingPrice = maxPrice ? ` under ₹${(maxPrice / 10000000).toFixed(1)} Cr` : '';
-        const matchingType = category ? ` ${category}s` : ' luxury properties';
-
-        reply = `I searched our exclusive database and found ${recommendations.length}${matchingType}${matchingCity}${matchingBhk}${matchingPrice}. Here are the matched portfolios that fit your criteria:`;
-      } else {
-        let fallbackProps = activeProperties;
-        if (city) {
-          fallbackProps = activeProperties.filter(p => p.city?.toLowerCase().includes(city!.toLowerCase()));
-        }
-        recommendations = fallbackProps.slice(0, 3);
-        
-        reply = `I couldn't find exact matches matching those direct criteria. However, you might be interested in these premium properties${city ? ` in ${city}` : ''} from our collection:`;
+      if (!res.ok) {
+        throw new Error('Chat API returned an error');
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: reply, recommendations }]);
+      const data = await res.json();
+      
+      // Match properties in client state based on returned IDs
+      let recommendations: Product[] = [];
+      if (data.matchedPropertyIds && data.matchedPropertyIds.length > 0) {
+        recommendations = activeProperties.filter(p => data.matchedPropertyIds.includes(p.id));
+      }
+
+      setMessages(prev => [...prev, { role: 'assistant', content: data.reply, recommendations }]);
+      speak(data.reply);
+    } catch (err) {
+      console.error(err);
+      const fallbackReply = 'My apologies, I am experiencing temporary connectivity issues. Please try again or search directly using our catalog filter options.';
+      setMessages(prev => [...prev, { role: 'assistant', content: fallbackReply }]);
+      speak(fallbackReply);
+    } finally {
       setIsTyping(false);
-      speak(reply);
-    }, 1500);
+    }
   };
 
   return (
