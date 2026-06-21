@@ -23,6 +23,7 @@ interface FormData {
   name: string;
   phone: string;
   email: string;
+  description: string;
 }
 
 const AMENITIES_LIST = [
@@ -36,6 +37,9 @@ const CITIES = ['Mumbai', 'Gurugram', 'Bengaluru', 'Delhi', 'Hyderabad', 'Pune',
 export default function PostPropertyWizard({ onClose }: { onClose?: () => void }) {
   const [step, setStep] = useState<Step>(1);
   const [submitted, setSubmitted] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiCompleted, setAiCompleted] = useState(false);
+
   const [form, setForm] = useState<FormData>({
     purpose: '',
     propertyType: '',
@@ -52,11 +56,47 @@ export default function PostPropertyWizard({ onClose }: { onClose?: () => void }
     amenities: [],
     name: '',
     phone: '',
-    email: ''
+    email: '',
+    description: ''
   });
 
   const set = (key: keyof FormData, val: any) => {
     setForm(prev => ({ ...prev, [key]: val }));
+  };
+
+  const runAiBoost = () => {
+    setAiLoading(true);
+    setAiCompleted(false);
+
+    setTimeout(() => {
+      const area = parseFloat(form.carpetArea) || 2000;
+      let rate = 12000;
+      const city = (form.city || '').toLowerCase();
+      
+      if (city.includes('mumbai')) rate = 55000;
+      else if (city.includes('gurugram') || city.includes('gurgaon')) rate = 28000;
+      else if (city.includes('bengaluru') || city.includes('bangalore')) rate = 17500;
+      else if (city.includes('delhi')) rate = 22000;
+
+      let estimatedPrice = area * rate;
+      if (form.purpose === 'RENT') {
+        estimatedPrice = Math.round((estimatedPrice * 0.035) / 12);
+        estimatedPrice = Math.round(estimatedPrice / 5000) * 5000;
+      } else {
+        estimatedPrice = Math.round(estimatedPrice / 500000) * 500000;
+      }
+
+      const amenitiesText = form.amenities.length > 0 
+        ? `equipped with premium features such as ${form.amenities.slice(0, 4).join(', ')}` 
+        : 'boasting state-of-the-art building layouts';
+
+      const generatedDesc = `An ultra-luxury ${form.facing || 'East Facing'}, ${form.furnishing || 'Furnished'} ${form.bhk || '3'} BHK ${form.propertyType || 'Apartment'} situated in the elite enclave of ${form.locality || 'Premium Locality'}, ${form.city || 'Mumbai'}. Spanning a generous ${form.carpetArea || '2,500'} sq.ft. of carpet area, this premium estate is ${amenitiesText}. Designed for the discerning HNI looking for peak architectural elegance.`;
+
+      set('price', estimatedPrice.toString());
+      set('description', generatedDesc);
+      setAiLoading(false);
+      setAiCompleted(true);
+    }, 1500);
   };
 
   const handleSubmit = async () => {
@@ -69,7 +109,7 @@ export default function PostPropertyWizard({ onClose }: { onClose?: () => void }
         name: `${form.bhk} BHK ${form.propertyType} in ${form.locality || 'Elite Area'}`,
         price: form.price ? parseFloat(form.price) : 0,
         brand: form.name || 'Owner',
-        description: `Luxurious ${form.bhk} BHK ${form.propertyType} in ${form.locality || 'Premium Locality'}, ${form.city || 'Mumbai'}. Floor: ${form.floor || '1'}/${form.totalFloors || '4'}. Facing: ${form.facing || 'East'}. Furnishing: ${form.furnishing || 'Unfurnished'}.`,
+        description: form.description || `Luxurious ${form.bhk} BHK ${form.propertyType} in ${form.locality || 'Premium Locality'}, ${form.city || 'Mumbai'}. Floor: ${form.floor || '1'}/${form.totalFloors || '4'}. Facing: ${form.facing || 'East'}. Furnishing: ${form.furnishing || 'Unfurnished'}.`,
         category: form.propertyType + 's',
         purpose: (form.purpose || 'SELL') === 'SELL' ? 'BUY' : 'RENT',
         bhk: parseInt(form.bhk) || 3,
@@ -318,13 +358,45 @@ export default function PostPropertyWizard({ onClose }: { onClose?: () => void }
       {/* Step 4: Contact */}
       {step === 4 && (
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-[#00ffcc]/5 border border-[#00ffcc]/15 mb-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#00ffcc]" />
-              <span className="text-xs text-[#00ffcc] font-bold">AI-Powered Listing Boost</span>
+          <div className="p-4 rounded-2xl bg-[#00ffcc]/5 border border-[#00ffcc]/15 mb-4 flex flex-col justify-between gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#00ffcc] animate-pulse" />
+                <span className="text-xs text-[#00ffcc] font-bold">AI-Powered Listing Boost</span>
+              </div>
+              <button
+                type="button"
+                onClick={runAiBoost}
+                disabled={aiLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00ffcc]/10 border border-[#00ffcc]/30 text-white hover:text-[#00ffcc] hover:border-[#00ffcc]/60 text-[10px] font-bold font-mono transition-all disabled:opacity-50 hover:scale-102 active:scale-98"
+              >
+                {aiLoading ? (
+                  <>
+                    <span className="animate-spin inline-block w-2.5 h-2.5 border-2 border-current border-t-transparent text-[#00ffcc] rounded-full mr-1" />
+                    Boosting...
+                  </>
+                ) : aiCompleted ? (
+                  '✨ Re-Boost'
+                ) : (
+                  '✨ Run AI Boost'
+                )}
+              </button>
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">Our Nexora AI will auto-generate a premium property description and suggest the optimal listing price based on current market data.</p>
+            <p className="text-[10px] text-gray-400">
+              Auto-generates an elite, professional description and estimates properties valuation based on square footage pricing benchmarks and rental yields.
+            </p>
           </div>
+
+          <div>
+            <label className={labelCls}>Property Description</label>
+            <textarea
+              className={`${inputCls} h-28 resize-none`}
+              placeholder="Provide a detailed description of the property, or click 'Run AI Boost' to auto-generate a premium one..."
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+            />
+          </div>
+
           <div>
             <label className={labelCls}>Your Full Name</label>
             <input className={inputCls} placeholder="e.g. Rajesh Kumar" value={form.name} onChange={e => set('name', e.target.value)} />

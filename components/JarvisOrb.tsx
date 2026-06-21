@@ -137,27 +137,85 @@ export default function JarvisOrb({ onAddToCart }: { onAddToCart: (p: any) => vo
     setIsTyping(true);
 
     setTimeout(() => {
-      let reply = 'Searching properties catalog...';
-      let recommendations: Product[] = [];
-
       const q = queryText.toLowerCase();
-      if (q.includes('sobha') || q.includes('windsor') || q.includes('bengaluru') || q.includes('bangalore')) {
-        reply = 'Displaying Sobha Windsor Royal Estate in Bengaluru. A Victorian-themed premium villa with ready completion status and private home theatre.';
-        recommendations = [activeProperties[3]];
-      } else if (q.includes('lodha') || q.includes('worli') || q.includes('mumbai') || q.includes('penthouse')) {
-        reply = 'Displaying Lodha World Tower Penthouse in Worli, Mumbai. This 5 BHK duplex offers an Arabian Sea facing view and private infinity pool.';
-        recommendations = [activeProperties[0]];
-      } else if (q.includes('dlf') || q.includes('camellias') || q.includes('gurugram') || q.includes('mansion')) {
-        reply = 'Displaying DLF The Camellias Mansion in Gurugram. A super-luxury duplex overlooking the golf course, ready to move.';
-        recommendations = [activeProperties[1]];
-      } else if (q.includes('godrej') || q.includes('duplex') || q.includes('smart') || q.includes('township')) {
-        reply = 'Displaying Godrej Horizon Duplex in Whitefield, Bengaluru. Under construction 4 BHK with integrated solar panels and private lawn.';
-        recommendations = [activeProperties[2]];
-      } else if (q.includes('compare') || q.includes('vs')) {
-        reply = 'Comparing premium residences: Lodha World Tower offers ocean views in Mumbai, whereas DLF The Camellias offers luxury golf course views in Gurugram.';
-        recommendations = [activeProperties[0], activeProperties[1]];
+      
+      // 1. Detect City
+      let city: string | null = null;
+      if (q.includes('mumbai') || q.includes('bombay')) city = 'Mumbai';
+      else if (q.includes('gurugram') || q.includes('gurgaon')) city = 'Gurugram';
+      else if (q.includes('bengaluru') || q.includes('bangalore')) city = 'Bengaluru';
+      else if (q.includes('delhi') || q.includes('ncr')) city = 'Delhi';
+      else if (q.includes('pune')) city = 'Pune';
+      else if (q.includes('hyderabad')) city = 'Hyderabad';
+
+      // 2. Detect BHK configuration
+      let bhk: number | null = null;
+      const bhkMatch = q.match(/(\d+)\s*bhk/);
+      if (bhkMatch) {
+        bhk = parseInt(bhkMatch[1]);
       } else {
-        reply = 'I am looking up our developer listings. Let me know if you want information on Lodha Mumbai Penthouses, DLF Gurugram Mansions, Godrej Bengaluru Duplexes, or Sobha Windsor Estates.';
+        const bedroomMatch = q.match(/(\d+)\s*bedroom/);
+        if (bedroomMatch) {
+          bhk = parseInt(bedroomMatch[1]);
+        }
+      }
+
+      // 3. Detect Price boundary (e.g. under 10 Cr, below 5 Crore, under 80 Lakhs)
+      let maxPrice: number | null = null;
+      const croreMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:crore|cr)/);
+      const lakhMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lakhs|l)/);
+      if (croreMatch) {
+        maxPrice = parseFloat(croreMatch[1]) * 10000000;
+      } else if (lakhMatch) {
+        maxPrice = parseFloat(lakhMatch[1]) * 100000;
+      } else {
+        const numberMatch = q.match(/(?:under|below|less than)\s*(\d+)/);
+        if (numberMatch) {
+          const val = parseInt(numberMatch[1]);
+          if (val < 100) {
+            maxPrice = val * 10000000;
+          }
+        }
+      }
+
+      // 4. Detect Category
+      let category: string | null = null;
+      if (q.includes('villa') || q.includes('mansion') || q.includes('house')) category = 'Villa';
+      else if (q.includes('penthouse') || q.includes('duplex')) category = 'Penthouse';
+      else if (q.includes('apartment') || q.includes('flat') || q.includes('studio')) category = 'Apartment';
+      else if (q.includes('township')) category = 'Township';
+
+      // 5. Detect Purpose
+      let purpose: 'BUY' | 'RENT' | null = null;
+      if (q.includes('rent') || q.includes('lease')) purpose = 'RENT';
+      else if (q.includes('buy') || q.includes('sale') || q.includes('purchase')) purpose = 'BUY';
+
+      // Perform dynamic filtering on active database properties
+      let recommendations = activeProperties.filter(p => {
+        if (city && p.city && !p.city.toLowerCase().includes(city.toLowerCase())) return false;
+        if (bhk && p.bhk && p.bhk !== bhk) return false;
+        if (maxPrice && p.price && p.price > maxPrice) return false;
+        if (category && p.category && !p.category.toLowerCase().includes(category.toLowerCase())) return false;
+        if (purpose && p.purpose && p.purpose !== purpose) return false;
+        return true;
+      });
+
+      let reply = '';
+      if (recommendations.length > 0) {
+        const matchingCity = city ? ` in ${city}` : '';
+        const matchingBhk = bhk ? ` featuring ${bhk} BHK` : '';
+        const matchingPrice = maxPrice ? ` under ₹${(maxPrice / 10000000).toFixed(1)} Cr` : '';
+        const matchingType = category ? ` ${category}s` : ' luxury properties';
+
+        reply = `I searched our exclusive database and found ${recommendations.length}${matchingType}${matchingCity}${matchingBhk}${matchingPrice}. Here are the matched portfolios that fit your criteria:`;
+      } else {
+        let fallbackProps = activeProperties;
+        if (city) {
+          fallbackProps = activeProperties.filter(p => p.city?.toLowerCase().includes(city!.toLowerCase()));
+        }
+        recommendations = fallbackProps.slice(0, 3);
+        
+        reply = `I couldn't find exact matches matching those direct criteria. However, you might be interested in these premium properties${city ? ` in ${city}` : ''} from our collection:`;
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply, recommendations }]);
