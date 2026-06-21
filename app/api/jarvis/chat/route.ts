@@ -3,9 +3,64 @@ import { prisma } from '@/lib/prisma';
 import { apiResponse, apiError } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+function getLocalMockResponse(message: string, properties: any[]) {
+  const q = message.toLowerCase();
+  let city: string | null = null;
+  if (q.includes('mumbai') || q.includes('bombay')) city = 'Mumbai';
+  else if (q.includes('gurugram') || q.includes('gurgaon')) city = 'Gurugram';
+  else if (q.includes('bengaluru') || q.includes('bangalore')) city = 'Bengaluru';
+  else if (q.includes('delhi') || q.includes('ncr')) city = 'Delhi';
+  else if (q.includes('pune')) city = 'Pune';
+  else if (q.includes('hyderabad')) city = 'Hyderabad';
+
+  let bhk: number | null = null;
+  const bhkMatch = q.match(/(\d+)\s*bhk/);
+  if (bhkMatch) bhk = parseInt(bhkMatch[1]);
+
+  let maxPrice: number | null = null;
+  const croreMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:crore|cr)/);
+  const lakhMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lakhs|l)/);
+  if (croreMatch) maxPrice = parseFloat(croreMatch[1]) * 10000000;
+  else if (lakhMatch) maxPrice = parseFloat(lakhMatch[1]) * 100000;
+
+  let category: string | null = null;
+  if (q.includes('villa') || q.includes('mansion')) category = 'Villa';
+  else if (q.includes('penthouse') || q.includes('duplex')) category = 'Penthouse';
+  else if (q.includes('apartment') || q.includes('flat')) category = 'Apartment';
+
+  let purpose: 'BUY' | 'RENT' | null = null;
+  if (q.includes('rent') || q.includes('lease')) purpose = 'RENT';
+  else if (q.includes('buy') || q.includes('sale') || q.includes('purchase')) purpose = 'BUY';
+
+  const filtered = properties.filter(p => {
+    if (city && p.city && !p.city.toLowerCase().includes(city.toLowerCase())) return false;
+    if (bhk && p.bhk && p.bhk !== bhk) return false;
+    if (maxPrice && p.price && p.price > maxPrice) return false;
+    if (category && p.category && !p.category.toLowerCase().includes(category.toLowerCase())) return false;
+    if (purpose && p.purpose && p.purpose !== purpose) return false;
+    return true;
+  });
+
+  let reply = '';
+  if (filtered.length > 0) {
+    reply = `Namaste! I searched our exclusive luxury database and found **${filtered.length} properties** matching your request. Here is what we recommend:`;
+  } else {
+    reply = `Hello! I couldn't find exact matches for that request, but here are some of our preeminent estates from our general collection:`;
+  }
+
+  return {
+    reply,
+    matchedPropertyIds: (filtered.length > 0 ? filtered : properties.slice(0, 3)).map(p => p.id),
+    isMocked: true
+  };
+}
+
 export async function POST(req: NextRequest) {
+  let messageText = '';
+  let propertiesList: any[] = [];
   try {
     const { message, history } = await req.json();
+    messageText = message || '';
 
     if (!message) {
       return apiError('Message is required.', 400);
@@ -15,6 +70,7 @@ export async function POST(req: NextRequest) {
     const properties = await prisma.property.findMany({
       where: { isApproved: true }
     });
+    propertiesList = properties;
 
     const propertiesContext = properties.map(p => ({
       id: p.id,
@@ -34,56 +90,8 @@ export async function POST(req: NextRequest) {
 
     if (!apiKey) {
       console.warn('[Jarvis Chat API] GEMINI_API_KEY is not defined in .env. Using mock fallback mode.');
-      // Simulating real-estate conversational response using rule-based local generator (or advanced fallback)
-      const q = message.toLowerCase();
-      let city: string | null = null;
-      if (q.includes('mumbai') || q.includes('bombay')) city = 'Mumbai';
-      else if (q.includes('gurugram') || q.includes('gurgaon')) city = 'Gurugram';
-      else if (q.includes('bengaluru') || q.includes('bangalore')) city = 'Bengaluru';
-      else if (q.includes('delhi') || q.includes('ncr')) city = 'Delhi';
-      else if (q.includes('pune')) city = 'Pune';
-      else if (q.includes('hyderabad')) city = 'Hyderabad';
-
-      let bhk: number | null = null;
-      const bhkMatch = q.match(/(\d+)\s*bhk/);
-      if (bhkMatch) bhk = parseInt(bhkMatch[1]);
-
-      let maxPrice: number | null = null;
-      const croreMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:crore|cr)/);
-      const lakhMatch = q.match(/(?:under|below|less than|within)\s*(?:rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lakhs|l)/);
-      if (croreMatch) maxPrice = parseFloat(croreMatch[1]) * 10000000;
-      else if (lakhMatch) maxPrice = parseFloat(lakhMatch[1]) * 100000;
-
-      let category: string | null = null;
-      if (q.includes('villa') || q.includes('mansion')) category = 'Villa';
-      else if (q.includes('penthouse') || q.includes('duplex')) category = 'Penthouse';
-      else if (q.includes('apartment') || q.includes('flat')) category = 'Apartment';
-
-      let purpose: 'BUY' | 'RENT' | null = null;
-      if (q.includes('rent') || q.includes('lease')) purpose = 'RENT';
-      else if (q.includes('buy') || q.includes('sale') || q.includes('purchase')) purpose = 'BUY';
-
-      const filtered = properties.filter(p => {
-        if (city && p.city && !p.city.toLowerCase().includes(city.toLowerCase())) return false;
-        if (bhk && p.bhk && p.bhk !== bhk) return false;
-        if (maxPrice && p.price && p.price > maxPrice) return false;
-        if (category && p.category && !p.category.toLowerCase().includes(category.toLowerCase())) return false;
-        if (purpose && p.purpose && p.purpose !== purpose) return false;
-        return true;
-      });
-
-      let reply = '';
-      if (filtered.length > 0) {
-        reply = `Namaste! I searched our exclusive luxury database and found **${filtered.length} properties** matching your request. Here is what we recommend:`;
-      } else {
-        reply = `Hello! I couldn't find exact matches for that request, but here are some of our preeminent estates from our general collection:`;
-      }
-
-      return apiResponse({
-        reply,
-        matchedPropertyIds: (filtered.length > 0 ? filtered : properties.slice(0, 3)).map(p => p.id),
-        isMocked: true
-      });
+      const mockRes = getLocalMockResponse(messageText, propertiesList);
+      return apiResponse(mockRes);
     }
 
     // Call Gemini API
@@ -97,7 +105,7 @@ export async function POST(req: NextRequest) {
 The client is looking for properties or asking questions.
 Here is the chat history:
 ${JSON.stringify(history || [])}
-Current user message: "${message}"
+Current user message: "${messageText}"
 
 Here is the database of available luxury properties:
 ${JSON.stringify(propertiesContext)}
@@ -124,7 +132,16 @@ Return EXACTLY a JSON object matching this schema:
       matchedPropertyIds: parsed.matchedPropertyIds || []
     });
   } catch (err) {
-    console.error('[Jarvis Chat API]', err);
-    return apiError('Failed to process request.', 500);
+    console.error('[Jarvis Chat API] Error during Gemini generation, falling back:', err);
+    try {
+      const fallbackMock = getLocalMockResponse(messageText || 'hi', propertiesList.length > 0 ? propertiesList : await prisma.property.findMany({ where: { isApproved: true } }));
+      return apiResponse({
+        ...fallbackMock,
+        reply: `*(Note: Using backup mode due to API key expiry/limitations)*\n\n${fallbackMock.reply}`
+      });
+    } catch (fallbackErr) {
+      console.error('[Jarvis Chat API] Error in fallback:', fallbackErr);
+      return apiError('Failed to process request.', 500);
+    }
   }
 }
