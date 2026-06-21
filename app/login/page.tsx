@@ -2,25 +2,42 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Phone, Lock, Mail, ArrowRight, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Sparkles, Phone, Lock, Mail, ArrowRight, CheckCircle, ShieldAlert, User, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import UniverseCanvas from '../../components/UniverseCanvas';
 import confetti from 'canvas-confetti';
-import { loginUser, registerUser } from '@/lib/api';
+import { loginUser, registerUser, sendOtp, verifyOtp } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
+  
+  // Auth view mode: LOGIN or REGISTER
+  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  
+  // Login configuration
   const [loginMethod, setLoginMethod] = useState<'OTP' | 'PASSWORD'>('OTP');
+  
+  // Common states
+  const [step, setStep] = useState<'INPUT' | 'VERIFYING' | 'SUCCESS'>('INPUT');
+  const [errorMsg, setErrorMsg] = useState('');
+  
+  // Login form fields
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  const [step, setStep] = useState<'INPUT' | 'VERIFYING' | 'SUCCESS'>('INPUT');
-  const [errorMsg, setErrorMsg] = useState('');
   const [otpSent, setOtpSent] = useState(false);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  // Registration form fields
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerCity, setRegisterCity] = useState('Mumbai');
+
+  const CITIES = ['Mumbai', 'Gurugram', 'Bengaluru', 'Delhi', 'Hyderabad', 'Pune'];
+
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber || phoneNumber.length < 10) {
       setErrorMsg('Please enter a valid 10-digit mobile number.');
@@ -29,18 +46,21 @@ export default function LoginPage() {
     setErrorMsg('');
     setStep('VERIFYING');
     
-    // Simulate sending OTP
-    setTimeout(() => {
+    try {
+      const res = await sendOtp(phoneNumber);
       setStep('INPUT');
       setOtpSent(true);
-      alert('Mock OTP code sent to mobile: 123456');
-    }, 1200);
+      alert(`[SIMULATED SMS] Your verification code is: ${res.code}`);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Mobile number is not registered. Please register first.');
+      setStep('INPUT');
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp !== '123456') {
-      setErrorMsg('Invalid OTP. Use mock code: 123456');
+    if (!otp) {
+      setErrorMsg('Please enter the verification code.');
       return;
     }
     
@@ -48,18 +68,18 @@ export default function LoginPage() {
     setStep('VERIFYING');
 
     try {
-      // Log in with seeded test user
-      const data = await loginUser('test@nexora.ai', 'user@123');
+      const data = await verifyOtp(phoneNumber, otp);
       setStep('SUCCESS');
       
       localStorage.setItem('nexora_user_session', JSON.stringify({
         isLoggedIn: true,
         name: data.user.name,
-        phone: phoneNumber || data.user.phone || '9876543210',
+        phone: data.user.phone || phoneNumber,
         email: data.user.email,
+        role: data.user.role,
         budget: data.user.budget || '₹5 Cr - ₹15 Cr',
         city: data.user.city || 'Mumbai',
-        shortlistedIds: [] // Will fetch dynamically
+        shortlistedIds: []
       }));
 
       confetti({
@@ -73,7 +93,7 @@ export default function LoginPage() {
         router.push('/dashboard');
       }, 1500);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Authentication failed.');
+      setErrorMsg(err.message || 'OTP verification failed.');
       setStep('INPUT');
     }
   };
@@ -96,9 +116,10 @@ export default function LoginPage() {
         name: data.user.name,
         phone: data.user.phone || '9876543210',
         email: data.user.email,
+        role: data.user.role,
         budget: data.user.budget || '₹5 Cr - ₹15 Cr',
         city: data.user.city || 'Mumbai',
-        shortlistedIds: [] // Will fetch dynamically
+        shortlistedIds: []
       }));
 
       confetti({
@@ -112,42 +133,58 @@ export default function LoginPage() {
         router.push('/dashboard');
       }, 1500);
     } catch (err: any) {
-      // Auto-register convenience feature
-      if (err.message.includes('Invalid email or password')) {
-        try {
-          const regData = await registerUser({
-            name: email.split('@')[0].toUpperCase(),
-            email,
-            password,
-            phone: '9876543210',
-            city: 'Mumbai'
-          });
-          setStep('SUCCESS');
-          localStorage.setItem('nexora_user_session', JSON.stringify({
-            isLoggedIn: true,
-            name: regData.user.name,
-            phone: regData.user.phone || '9876543210',
-            email: regData.user.email,
-            budget: '₹5 Cr - ₹15 Cr',
-            city: 'Mumbai',
-            shortlistedIds: []
-          }));
-          confetti({
-            particleCount: 100,
-            spread: 60,
-            origin: { y: 0.6 },
-            colors: ['#00ffcc', '#cc00ff', '#ffffff']
-          });
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1500);
-          return;
-        } catch (regErr: any) {
-          setErrorMsg(regErr.message || 'Authentication failed.');
-        }
-      } else {
-        setErrorMsg(err.message || 'Authentication failed.');
-      }
+      setErrorMsg(err.message || 'Invalid email or password.');
+      setStep('INPUT');
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registerName || !registerEmail || !registerPassword || !registerPhone) {
+      setErrorMsg('All fields are required.');
+      return;
+    }
+    if (registerPassword.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+    setErrorMsg('');
+    setStep('VERIFYING');
+
+    try {
+      const data = await registerUser({
+        name: registerName,
+        email: registerEmail,
+        password: registerPassword,
+        phone: registerPhone,
+        city: registerCity
+      });
+
+      setStep('SUCCESS');
+
+      localStorage.setItem('nexora_user_session', JSON.stringify({
+        isLoggedIn: true,
+        name: data.user.name,
+        phone: data.user.phone || registerPhone,
+        email: data.user.email,
+        role: data.user.role,
+        budget: '₹5 Cr - ₹15 Cr',
+        city: data.user.city || registerCity,
+        shortlistedIds: []
+      }));
+
+      confetti({
+        particleCount: 100,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ['#00ffcc', '#cc00ff', '#ffffff']
+      });
+
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 1500);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Registration failed.');
       setStep('INPUT');
     }
   };
@@ -171,15 +208,15 @@ export default function LoginPage() {
             </span>
           </Link>
           <h2 className="text-lg md:text-2xl font-black tracking-tight text-white pt-2">
-            Welcome to Premium Living
+            {authMode === 'LOGIN' ? 'Welcome to Premium Living' : 'Create HNI Client Account'}
           </h2>
           <p className="text-[10px] md:text-xs text-gray-500 font-mono tracking-wider uppercase">
-            Login or Register to track shortlists and site tours
+            {authMode === 'LOGIN' ? 'Login to track shortlists and site tours' : 'Register to unlock exclusive real estate portfolios'}
           </p>
         </div>
 
-        {/* Tabs */}
-        {step === 'INPUT' && (
+        {/* Login Tabs */}
+        {step === 'INPUT' && authMode === 'LOGIN' && (
           <div className="flex border-b border-white/5 pb-1">
             <button
               onClick={() => {
@@ -223,83 +260,200 @@ export default function LoginPage() {
         {/* Dynamic Forms */}
         {step === 'INPUT' && (
           <>
-            {loginMethod === 'OTP' ? (
-              <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Mobile Number</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      disabled={otpSent}
-                      onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="Enter 10-digit mobile number..."
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600 disabled:opacity-50"
-                    />
-                  </div>
-                </div>
+            {authMode === 'LOGIN' ? (
+              <>
+                {loginMethod === 'OTP' ? (
+                  <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Mobile Number</label>
+                      <div className="relative">
+                        <Phone className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                        <input
+                          type="tel"
+                          value={phoneNumber}
+                          disabled={otpSent}
+                          onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                          placeholder="Enter 10-digit mobile number..."
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600 disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
 
-                {otpSent && (
-                  <div className="space-y-1 animate-in fade-in duration-300">
-                    <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Enter OTP Code</label>
+                    {otpSent && (
+                      <div className="space-y-1 animate-in fade-in duration-300">
+                        <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Enter OTP Code</label>
+                        <div className="relative">
+                          <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            value={otp}
+                            onChange={e => setOtp(e.target.value.trim().slice(0, 6))}
+                            placeholder="Enter 6-digit OTP..."
+                            className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600 font-mono tracking-widest text-center"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-xl bg-[#00ffcc] text-black font-black text-[10px] tracking-widest uppercase hover:scale-102 active:scale-98 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {otpSent ? 'Verify OTP Code' : 'Send OTP verification'} <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handlePasswordLogin} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Email Address</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          placeholder="Enter email address..."
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#cc00ff]/30 rounded-xl text-xs text-white placeholder-gray-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          placeholder="Enter account password..."
+                          className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#cc00ff]/30 rounded-xl text-xs text-white placeholder-gray-600"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 rounded-xl bg-[#cc00ff] text-white font-black text-[10px] tracking-widest uppercase hover:scale-102 active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-glow-pink"
+                    >
+                      Verify Credentials <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                )}
+                
+                {/* Switch to Register */}
+                <div className="text-center pt-2">
+                  <span className="text-[10px] text-gray-500 font-mono">Don't have an account? </span>
+                  <button
+                    onClick={() => {
+                      setAuthMode('REGISTER');
+                      setErrorMsg('');
+                    }}
+                    className="text-[10px] font-bold font-mono text-[#00ffcc] hover:underline"
+                  >
+                    SIGN UP NOW
+                  </button>
+                </div>
+              </>
+            ) : (
+              // Explicit Registration Form
+              <>
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Full Name</label>
                     <div className="relative">
-                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                      <User className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
                       <input
                         type="text"
-                        value={otp}
-                        onChange={e => setOtp(e.target.value.trim().slice(0, 6))}
-                        placeholder="Enter 6-digit OTP (123456)..."
-                        className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600 font-mono tracking-widest text-center"
+                        value={registerName}
+                        onChange={e => setRegisterName(e.target.value)}
+                        placeholder="Enter full name..."
+                        className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600"
                       />
                     </div>
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-[#00ffcc] text-black font-black text-[10px] tracking-widest uppercase hover:scale-102 active:scale-98 transition-all flex items-center justify-center gap-1.5"
-                >
-                  {otpSent ? 'Verify OTP Code' : 'Send OTP verification'} <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="Enter email address..."
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#cc00ff]/30 rounded-xl text-xs text-white placeholder-gray-600"
-                    />
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Email Address</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                      <input
+                        type="email"
+                        value={registerEmail}
+                        onChange={e => setRegisterEmail(e.target.value)}
+                        placeholder="Enter email address..."
+                        className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="Enter account password..."
-                      className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#cc00ff]/30 rounded-xl text-xs text-white placeholder-gray-600"
-                    />
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Mobile Number</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                      <input
+                        type="tel"
+                        value={registerPhone}
+                        onChange={e => setRegisterPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        placeholder="Enter 10-digit phone number..."
+                        className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-[#cc00ff] text-white font-black text-[10px] tracking-widest uppercase hover:scale-102 active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-glow-pink"
-                >
-                  Verify Credentials <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Password (min. 6 chars)</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                      <input
+                        type="password"
+                        value={registerPassword}
+                        onChange={e => setRegisterPassword(e.target.value)}
+                        placeholder="Create strong password..."
+                        className="w-full pl-11 pr-4 py-3.5 bg-white/3 border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white placeholder-gray-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-mono text-gray-500 font-bold uppercase tracking-wider">Preferred City</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-500" />
+                      <select
+                        value={registerCity}
+                        onChange={e => setRegisterCity(e.target.value)}
+                        style={{ colorScheme: 'dark', backgroundColor: '#0d0d0d' }}
+                        className="w-full pl-11 pr-4 py-3.5 bg-black border border-white/5 focus:outline-none focus:border-[#00ffcc]/30 rounded-xl text-xs text-white appearance-none cursor-pointer"
+                      >
+                        {CITIES.map(c => (
+                          <option key={c} value={c} style={{ background: '#0d0d0d' }}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#00ffcc] to-[#cc00ff] text-black font-black text-[10px] tracking-widest uppercase hover:scale-102 active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-glow-cyan"
+                  >
+                    Register Premium Account <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+
+                {/* Switch to Login */}
+                <div className="text-center pt-2">
+                  <span className="text-[10px] text-gray-500 font-mono">Already have an account? </span>
+                  <button
+                    onClick={() => {
+                      setAuthMode('LOGIN');
+                      setErrorMsg('');
+                    }}
+                    className="text-[10px] font-bold font-mono text-[#cc00ff] hover:underline"
+                  >
+                    LOG IN NOW
+                  </button>
+                </div>
+              </>
             )}
           </>
         )}

@@ -1,87 +1,61 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, Users, User, Database, ShieldAlert, Sparkles, TrendingUp, Cpu, Server } from 'lucide-react';
 import Link from 'next/link';
 import UniverseCanvas from '../../components/UniverseCanvas';
-
-import { Transaction, FraudAlert } from '../../types';
+import { getMe, getAdminStats, getAdminProperties, approveProperty } from '@/lib/api';
 
 export default function AdminDashboard() {
-  const [liveTransactions, setLiveTransactions] = useState<Transaction[]>([]);
-  const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[]>([]);
-  const [activeUsers, setActiveUsers] = useState(1450);
-  const [ordersCount, setOrdersCount] = useState(342);
-  const [dailyRevenue, setDailyRevenue] = useState(18450000);
-  
+  const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
+  const [pendingProperties, setPendingProperties] = useState<any[]>([]);
+  const [recentInquiries, setRecentInquiries] = useState<any[]>([]);
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const [queryInput, setQueryInput] = useState('');
   const [queryReply, setQueryReply] = useState('Type an NLP question to request forecasting calculations.');
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('nexora_user_session');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.isLoggedIn) {
-          setIsLoggedIn(true);
-        }
-      } catch (e) {}
+  const loadAdminData = async () => {
+    try {
+      const meRes = await getMe();
+      if (!meRes.user || meRes.user.role !== 'ADMIN') {
+        router.push('/');
+        return;
+      }
+      setIsLoggedIn(true);
+      setIsAdmin(true);
+
+      const statsRes = await getAdminStats();
+      setStats(statsRes.stats);
+      setRecentInquiries(statsRes.recentInquiries || []);
+      setRecentUsers(statsRes.recentUsers || []);
+
+      const pendingRes = await getAdminProperties({ approved: 'false' });
+      setPendingProperties(pendingRes.properties || []);
+    } catch (err) {
+      console.error('Admin loading failed:', err);
+      router.push('/login');
     }
-  }, []);
+  };
 
-  // Simulate Socket connection via random intervals
   useEffect(() => {
-    const timer = setInterval(() => {
-      const seconds = new Date().getSeconds();
-      
-      // Volatility logic
-      const uCount = 1420 + Math.floor(Math.sin(seconds / 5) * 60);
-      const oCount = 342 + Math.floor(seconds / 2.5);
-      const rev = 18450000 + Math.floor(seconds * 12000);
-
-      setActiveUsers(uCount);
-      setOrdersCount(oCount);
-      setDailyRevenue(rev);
-
-      // Random new transaction
-      if (Math.random() > 0.4) {
-        const tx: Transaction = {
-          id: `tx-${Date.now()}`,
-          amount: [100000, 200000, 500000, 1000000][Math.floor(Math.random() * 4)],
-          location: ['Mumbai Worli', 'Gurugram Golf Course Rd', 'Whitefield Bengaluru', 'South Delhi', 'Kolkata New Town'][Math.floor(Math.random() * 5)],
-          timestamp: new Date().toLocaleTimeString()
-        };
-        setLiveTransactions(prev => [tx, ...prev].slice(0, 3));
-      }
-
-      // Random compliance alert
-      if (seconds % 17 === 0) {
-        setFraudAlerts(prev => [
-          {
-            id: `fa-${Date.now()}`,
-            message: 'Verification check: Duplicate site visit request flagged and merged',
-            severity: 'MEDIUM' as const,
-            timestamp: new Date().toLocaleTimeString()
-          },
-          ...prev
-        ].slice(0, 2));
-      } else if (seconds % 29 === 0) {
-        setFraudAlerts(prev => [
-          {
-            id: `fa-${Date.now()}`,
-            message: 'Security alert: Multiple site visit requests from single IP blocked',
-            severity: 'HIGH' as const,
-            timestamp: new Date().toLocaleTimeString()
-          },
-          ...prev
-        ].slice(0, 2));
-      }
-    }, 3000);
-
-    return () => clearInterval(timer);
+    loadAdminData();
   }, []);
+
+  const handleApproveProperty = async (id: string, approve: boolean) => {
+    try {
+      await approveProperty(id, approve);
+      alert(approve ? 'Property approved successfully and is now live!' : 'Property listing rejected.');
+      loadAdminData();
+    } catch (err: any) {
+      alert(err.message || 'Action failed.');
+    }
+  };
 
   const handleAdminQuery = () => {
     if (!queryInput.trim()) return;
@@ -138,10 +112,10 @@ export default function AdminDashboard() {
         {/* Core Live Metrics grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'ACTIVE SITE VISITORS', val: activeUsers, icon: Users, color: 'text-[#00ffcc]' },
-            { label: 'REGISTERED AGENTS', val: '88 active', icon: Server, color: 'text-gray-400' },
-            { label: 'VISITS BOOKED TODAY', val: ordersCount, icon: Cpu, color: 'text-white' },
-            { label: 'SHORTLISTED PORTFOLIO VALUE', val: `₹${dailyRevenue.toLocaleString('en-IN')}`, icon: TrendingUp, color: 'text-[#cc00ff]' }
+            { label: 'TOTAL ESTATES', val: stats?.properties?.total ?? 0, icon: Database, color: 'text-white' },
+            { label: 'PENDING REVIEWS', val: stats?.properties?.pending ?? 0, icon: ShieldAlert, color: 'text-yellow-400' },
+            { label: 'REGISTERED CLIENTS', val: stats?.users?.total ?? 0, icon: Users, color: 'text-[#00ffcc]' },
+            { label: 'TOTAL INQUIRIES', val: stats?.inquiries?.total ?? 0, icon: Cpu, color: 'text-[#cc00ff]' }
           ].map((m, idx) => (
             <div key={idx} className="p-4 rounded-xl bg-white/3 border border-white/5 flex items-center justify-between">
               <div>
@@ -253,46 +227,119 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Properties Awaiting Approval */}
+        <div className="p-6 rounded-2xl glassmorphism border border-white/5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <span className="text-xs font-bold font-mono tracking-widest text-[#00ffcc] uppercase flex items-center gap-1.5">
+              <Database className="w-4 h-4 text-[#00ffcc]" /> Properties Awaiting RERA & Listing Approval
+            </span>
+            <span className="text-[9px] text-gray-500 font-mono">{pendingProperties.length} pending review</span>
+          </div>
+
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+            {pendingProperties.map(p => (
+              <div key={p.id} className="p-4 rounded-xl bg-white/3 border border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-[#00ffcc]/20 transition-all">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-white">{p.name}</h4>
+                    <span className="text-[8px] font-mono bg-white/5 px-2 py-0.5 rounded text-gray-400 border border-white/5">
+                      {p.category}
+                    </span>
+                    <span className="text-[8px] font-mono bg-white/5 px-2 py-0.5 rounded text-[#00ffcc] border border-[#00ffcc]/10">
+                      {p.purpose}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-gray-400 font-mono">
+                    Owner: {p.postedBy?.name || 'Owner'} ({p.postedBy?.email}) • City: {p.city} • Locality: {p.locality || 'N/A'} • Area: {p.carpetArea || 'N/A'}
+                  </p>
+                  <p className="text-[10px] text-[#00ffcc] font-mono font-bold pt-0.5">
+                    ₹{p.price.toLocaleString('en-IN')}
+                  </p>
+                </div>
+
+                <div className="flex gap-2 w-full md:w-auto">
+                  <button
+                    onClick={() => handleApproveProperty(p.id, true)}
+                    className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-[#00ffcc] text-black font-bold hover:shadow-[0_0_15px_rgba(0,255,204,0.3)] transition-all text-[9px] tracking-wider uppercase"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleApproveProperty(p.id, false)}
+                    className="flex-1 md:flex-none px-4 py-2 rounded-xl bg-red-900/20 border border-red-500/20 text-red-400 hover:bg-red-900/30 transition-all text-[9px] tracking-wider uppercase"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {pendingProperties.length === 0 && (
+              <div className="text-center py-12 text-[10px] text-gray-600 font-mono uppercase tracking-wider">
+                All submitted property listings are verified & live.
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Live Transaction logs & Telemetry ticks */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="p-6 rounded-2xl glassmorphism space-y-4">
             <div className="pb-2 border-b border-white/5">
-              <span className="text-xs font-bold font-mono text-gray-400 uppercase tracking-widest">LIVE BOOKING LOGS (TOKEN PAYMENTS)</span>
+              <span className="text-xs font-bold font-mono text-gray-400 uppercase tracking-widest">RECENT SITE VISIT & INQUIRY BOOKINGS</span>
             </div>
             
             <div className="space-y-2.5 h-44 overflow-y-auto pr-1">
-              {liveTransactions.map(tx => (
-                <div key={tx.id} className="p-3 rounded-xl bg-white/3 border border-white/5 flex justify-between items-center animate-in fade-in">
+              {recentInquiries.map(inq => (
+                <div key={inq.id} className="p-3 rounded-xl bg-white/3 border border-white/5 flex justify-between items-center animate-in fade-in">
                   <div>
-                    <span className="text-xs text-white font-bold">Booking deposit verified</span>
-                    <span className="text-[9px] text-gray-500 font-mono block">{tx.location} • {tx.timestamp}</span>
+                    <span className="text-xs text-white font-bold">{inq.type} request</span>
+                    <span className="text-[9px] text-gray-500 font-mono block">
+                      Client: {inq.name} ({inq.phone}) • {new Date(inq.createdAt).toLocaleDateString()}
+                    </span>
+                    <span className="text-[9px] text-gray-400 block mt-0.5">
+                      Property: {inq.property?.name} ({inq.property?.city})
+                    </span>
                   </div>
-                  <span className="text-xs font-bold font-mono text-[#00ffcc]">+₹{tx.amount.toLocaleString('en-IN')}</span>
+                  <span className={`text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase border ${
+                    inq.status === 'CONFIRMED'
+                      ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                      : inq.status === 'PENDING'
+                      ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                      : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                  }`}>
+                    {inq.status}
+                  </span>
                 </div>
               ))}
-              {liveTransactions.length === 0 && (
-                <div className="text-center py-10 text-[10px] text-gray-600 font-mono">Listening for site visits...</div>
+              {recentInquiries.length === 0 && (
+                <div className="text-center py-10 text-[10px] text-gray-600 font-mono">No recent inquiries.</div>
               )}
             </div>
           </div>
 
           <div className="p-6 rounded-2xl glassmorphism space-y-4">
             <div className="pb-2 border-b border-white/5">
-              <span className="text-xs font-bold font-mono text-gray-400 uppercase tracking-widest">COMPLIANCE & AUDIT LOGS</span>
+              <span className="text-xs font-bold font-mono text-gray-400 uppercase tracking-widest">COMPLIANCE & HNI CLIENT LOGS</span>
             </div>
 
             <div className="space-y-2.5 h-44 overflow-y-auto pr-1">
-              {fraudAlerts.map(fa => (
-                <div key={fa.id} className="p-3 rounded-xl bg-red-950/20 border border-red-500/20 flex gap-2.5 items-start animate-in fade-in">
-                  <ShieldAlert className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              {recentUsers.map(user => (
+                <div key={user.id} className="p-3 rounded-xl bg-white/3 border border-white/5 flex gap-2.5 items-start animate-in fade-in">
+                  <User className="w-4 h-4 text-[#00ffcc] shrink-0 mt-0.5 animate-pulse" />
                   <div>
-                    <p className="text-[10px] text-red-400 font-bold">{fa.message}</p>
-                    <p className="text-[8px] text-red-500/60 font-mono mt-0.5">STATUS: {fa.severity} • {fa.timestamp}</p>
+                    <p className="text-[10px] text-gray-300 font-bold">New HNI Client Registered</p>
+                    <p className="text-[9px] text-gray-500 font-mono mt-0.5">
+                      Name: {user.name} • Email: {user.email} • City: {user.city || 'N/A'}
+                    </p>
+                    <p className="text-[8px] text-gray-500/60 font-mono">
+                      Date: {new Date(user.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
               ))}
-              {fraudAlerts.length === 0 && (
-                <div className="text-center py-10 text-[10px] text-gray-600 font-mono">No compliance alerts. Database fully verified.</div>
+              {recentUsers.length === 0 && (
+                <div className="text-center py-10 text-[10px] text-gray-600 font-mono">No recent client registrations.</div>
               )}
             </div>
           </div>

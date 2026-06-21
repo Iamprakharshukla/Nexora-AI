@@ -175,3 +175,41 @@ export async function subscribeNewsletter(email: string) {
     body: JSON.stringify({ email })
   });
 }
+
+export async function deleteProperty(id: string) {
+  return await apiFetch(`/api/properties/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+// ── Admin APIs ──────────────────────────────────────────────────────────────
+export async function getAdminStats() {
+  return await apiFetch('/api/admin/stats');
+}
+
+export async function getAdminProperties(params?: Record<string, string>) {
+  const query = params ? '?' + new URLSearchParams(params).toString() : '';
+  return await apiFetch(`/api/admin/properties${query}`);
+}
+
+export async function approveProperty(id: string, approve: boolean) {
+  return await apiFetch(`/api/admin/properties/${id}/approve`, {
+    method: 'PATCH',
+    body: JSON.stringify({ approve })
+  });
+}
+
+// ── OTP APIs ────────────────────────────────────────────────────────────────
+export async function sendOtp(phone: string) {
+  return await apiFetch('/api/auth/otp/send', {
+    method: 'POST',
+    body: JSON.stringify({ phone })
+  });
+}
+
+export async function verifyOtp(phone: string, code: string) {
+  return await apiFetch('/api/auth/otp/verify', {
+    method: 'POST',
+    body: JSON.stringify({ phone, code })
+  });
+}

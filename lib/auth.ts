@@ -5,6 +5,8 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'nexora-ai-super-secret-jwt-key-2026'
 );
 
+export const otpStore = new Map<string, { code: string; expires: number }>();
+
 export interface JWTPayload {
   userId: string;
   email: string;

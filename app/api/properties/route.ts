@@ -18,8 +18,19 @@ export async function GET(req: NextRequest) {
     const page      = parseInt(searchParams.get('page') || '1');
     const limit     = parseInt(searchParams.get('limit') || '20');
     const search    = searchParams.get('search');
+    const owner     = searchParams.get('owner');
 
-    const where: Record<string, unknown> = { isApproved: true };
+    const where: Record<string, unknown> = {};
+
+    if (owner === 'true') {
+      const user = await getUserFromRequest(req);
+      if (!user) {
+        return apiError('Unauthorized.', 401);
+      }
+      where.postedById = user.userId;
+    } else {
+      where.isApproved = true;
+    }
 
     if (purpose) where.purpose = purpose.toUpperCase();
     if (city)    where.city = { contains: city };

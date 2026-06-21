@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin, apiResponse, apiError } from '@/lib/auth';
+import { getUserFromRequest, requireAdmin, apiResponse, apiError } from '@/lib/auth';
 
 // ── GET /api/properties/[id] ──────────────────────────────────────────────────
 export async function GET(
@@ -68,14 +68,27 @@ export async function PUT(
   }
 }
 
-// ── DELETE /api/properties/[id] — Admin only ──────────────────────────────────
+// ── DELETE /api/properties/[id] — Admin or Owner ──────────────────────────────
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin(req);
+    const user = await getUserFromRequest(req);
+    if (!user) {
+      return apiError('Unauthorized.', 401);
+    }
     const { id } = await params;
+
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property) {
+      return apiError('Property not found.', 404);
+    }
+
+    if (user.role !== 'ADMIN' && property.postedById !== user.userId) {
+      return apiError('Forbidden.', 403);
+    }
+
     await prisma.property.delete({ where: { id } });
     return apiResponse({ message: 'Property deleted successfully.' });
   } catch (err) {

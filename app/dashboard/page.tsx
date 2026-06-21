@@ -7,7 +7,7 @@ import Link from 'next/link';
 import UniverseCanvas from '../../components/UniverseCanvas';
 import { Product } from '../../types';
 import { productsDb } from '../../types/properties';
-import { getMe, getShortlist, removeFromShortlist, submitInquiry, setAuthToken } from '@/lib/api';
+import { getMe, getProperties, postProperty, deleteProperty, getShortlist, removeFromShortlist, submitInquiry, setAuthToken } from '@/lib/api';
 
 interface UserSession {
   isLoggedIn: boolean;
@@ -16,6 +16,7 @@ interface UserSession {
   email: string;
   budget: string;
   city: string;
+  role: string;
   shortlistedIds: string[];
 }
 
@@ -65,6 +66,7 @@ export default function DashboardPage() {
           email: me.email,
           budget: me.budget || '₹5 Cr - ₹15 Cr',
           city: me.city || 'Mumbai',
+          role: me.role,
           shortlistedIds: []
         };
 
@@ -78,20 +80,16 @@ export default function DashboardPage() {
         // Load Real Shortlist from API
         const shortlistRes = await getShortlist();
         setShortlistedProperties(shortlistRes.properties || []);
+
+        // Load Real Listed Properties from API
+        const listedRes = await getProperties({ owner: 'true' });
+        setUserListedProperties(listedRes.properties || []);
       } catch (err) {
         redirectToLogin();
       }
     }
 
     loadDashboardData();
-
-    // Load user listed properties from localStorage (mock/sync purposes)
-    const savedProperties = localStorage.getItem('nexora_user_posted_properties');
-    if (savedProperties) {
-      try {
-        setUserListedProperties(JSON.parse(savedProperties));
-      } catch (e) {}
-    }
 
     // Set initial mock site visits
     setSiteVisits([
@@ -173,7 +171,7 @@ export default function DashboardPage() {
   };
 
   // Post Property handler
-  const handlePostProperty = (e: React.FormEvent) => {
+  const handlePostProperty = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!postPropertyName || !postPrice || !postDeveloper) {
       alert('Please fill in Property Name, Developer, and Price.');
@@ -195,42 +193,50 @@ export default function DashboardPage() {
           'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80'
         ];
 
-    const newProp: Product = {
-      id: `user-prod-${Date.now()}`,
-      name: postPropertyName,
-      brand: postDeveloper,
-      price: Number(postPrice),
-      purpose: postPurpose,
-      category: postCategory,
-      carpetArea: postCarpetArea ? `${postCarpetArea} sq. ft.` : '4,000 sq. ft.',
-      facing: postFacing,
-      description: postDescription || 'Premium developer estate listing.',
-      completionStatus: postPurpose === 'RENT' ? 'Ready to Occupy' : 'Ready to Move',
-      reraId: `RERA-USER-${Math.floor(100000 + Math.random() * 900000)}`,
-      rating: 5.0,
-      reviewsCount: 0,
-      images: defaultImages
-    };
+    try {
+      await postProperty({
+        name: postPropertyName,
+        price: parseFloat(postPrice),
+        brand: postDeveloper,
+        description: postDescription || 'Premium developer estate listing.',
+        category: postCategory,
+        purpose: postPurpose === 'RENT' ? 'RENT' : 'BUY',
+        bhk: 3,
+        locality: 'Worli',
+        city: cityInput,
+        furnishing: 'FURNISHED',
+        facing: postFacing,
+        carpetArea: postCarpetArea ? `${postCarpetArea} sq. ft.` : '4,000 sq. ft.',
+        carpetAreaSqFt: postCarpetArea ? parseFloat(postCarpetArea) : 4000,
+        amenities: ['Power Backup', 'Security', 'Parking'],
+        images: defaultImages
+      });
 
-    const updatedList = [...userListedProperties, newProp];
-    setUserListedProperties(updatedList);
-    localStorage.setItem('nexora_user_posted_properties', JSON.stringify(updatedList));
+      setPostSuccess(true);
 
-    setPostSuccess(true);
-    setTimeout(() => {
-      setPostSuccess(false);
-      setPostPropertyName('');
-      setPostDeveloper('');
-      setPostPrice('');
-      setPostCarpetArea('');
-      setPostDescription('');
-    }, 1500);
+      const listedRes = await getProperties({ owner: 'true' });
+      setUserListedProperties(listedRes.properties || []);
+
+      setTimeout(() => {
+        setPostSuccess(false);
+        setPostPropertyName('');
+        setPostDeveloper('');
+        setPostPrice('');
+        setPostCarpetArea('');
+        setPostDescription('');
+      }, 1500);
+    } catch (err: any) {
+      alert(err.message || 'Failed to post property.');
+    }
   };
 
-  const handleDeleteUserListing = (id: string) => {
-    const updatedList = userListedProperties.filter(p => p.id !== id);
-    setUserListedProperties(updatedList);
-    localStorage.setItem('nexora_user_posted_properties', JSON.stringify(updatedList));
+  const handleDeleteUserListing = async (id: string) => {
+    try {
+      await deleteProperty(id);
+      setUserListedProperties(prev => prev.filter(p => p.id !== id));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete listing.');
+    }
   };
 
   if (!session) return null;
@@ -274,6 +280,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {session.role === 'ADMIN' && (
+              <Link
+                href="/admin"
+                className="px-3 py-1 rounded-xl border border-[#cc00ff]/30 bg-[#cc00ff]/10 text-[10px] font-bold font-mono tracking-wider transition-all hover:bg-[#cc00ff]/20 text-[#cc00ff] flex items-center gap-1"
+              >
+                <Sparkles className="w-3 h-3 text-[#cc00ff]" /> ADMIN DASHBOARD
+              </Link>
+            )}
             <span className="text-[10px] font-mono text-gray-400 bg-white/5 border border-white/10 px-3 py-1 rounded-full uppercase">
               Buyer & Seller Portal
             </span>

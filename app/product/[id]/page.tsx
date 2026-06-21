@@ -5,6 +5,7 @@ import { Sparkles, Star, ChevronLeft, ShieldCheck, Calendar, User, RefreshCw } f
 import Link from 'next/link';
 import UniverseCanvas from '../../../components/UniverseCanvas';
 
+import { getPropertyDetail } from '@/lib/api';
 import { Product } from '../../../types';
 import { productsDb } from '../../../types/properties';
 
@@ -19,18 +20,24 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    let activeProps = [...productsDb];
-    const savedProperties = localStorage.getItem('nexora_user_posted_properties');
-    if (savedProperties) {
+    async function loadProduct() {
       try {
-        const userProps = JSON.parse(savedProperties) as Product[];
-        activeProps = [...productsDb, ...userProps];
-      } catch (e) {}
+        const detailRes = await getPropertyDetail(unwrappedParams.id);
+        if (detailRes.property) {
+          setProduct(detailRes.property);
+          setActiveImageIdx(0);
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load product from API, falling back to static db:', e);
+      }
+
+      const match = productsDb.find(p => p.id === unwrappedParams.id);
+      setProduct(match || productsDb[0]);
+      setActiveImageIdx(0);
     }
 
-    const match = activeProps.find(p => p.id === unwrappedParams.id);
-    setProduct(match || activeProps[0]);
-    setActiveImageIdx(0);
+    loadProduct();
 
     const saved = localStorage.getItem('nexora_user_session');
     if (saved) {
